@@ -1,134 +1,91 @@
-;; Patrik Wikström, QUT
-;; September 2014
-;; a new comment
-;; an even newer one
+;; *********************
+;; Patrik Wikstrom
+;; QUT 2013
+;;
+;; Simple network generation model
+;; Vary ratio new connections based on friendship or random
+;; *********************
 
 
-globals [
-  features
-  global-average
-]
-
-
-turtles-own [
-  habit
-  speed
-  length-memory
-  feat-memory
-  perc-feat
-]
-
+;; This procedure is used in the setup to create the fully connected network
+to create-a-random-link
+  let turtle-a one-of turtles
+  let turtle-b one-of turtles
+  ask turtle-a [
+    ifelse link-neighbor? turtle-b or turtle-a = turtle-b [create-a-random-link]
+    [create-link-with turtle-b]
+  ]
+end
 
 to setup
   clear-all
-  set features 0 ;; both services are equally "good"
-
-  ;; create turtles on random patches.
-  ask n-of 2500 patches
-    [ sprout 1
-      [ 
-        set color grey
-        set shape "square"
-        set size 0.85
-        set habit random-normal 0 0.2
-        set speed random-normal 1 0.3
-        set length-memory 10 + random 20
-        set feat-memory [ 0 ]
-        repeat length-memory [ set feat-memory fput 0 feat-memory ]
-        set perc-feat mean feat-memory
-        if speed < 0 [ set speed 0 ]
-      ]
-    ]
-  update-turtles
+  set-default-shape turtles "circle"
+  crt connect [ setxy random-xcor random-ycor]
+  
+  ;; make the network look pretty
+  while [(2 * count links) < (count turtles * (count turtles - 1)) ] [
+    create-a-random-link   
+    layout-spring (turtles with [any? link-neighbors]) links 0.4 6 1
+  ]  
   reset-ticks
 end
 
 
-to go
-  update-globals
-  update-turtles
-  tick
-end
-
-
-to update-globals
-  
-  set global-average mean [habit] of turtles
+to create-new-node [new-links]
+  let next-node one-of turtles
+  let friend-nodes [link-neighbors] of next-node
+  let nnn 0
+  crt 1 [
+    setxy random-xcor random-ycor
+    create-link-with next-node
+    while [count link-neighbors < new-links] [
+      ifelse new-links < count friend-nodes [set nnn new-links][set nnn count friend-nodes]
  
-  let advancement random-exponential 0.1 - random-exponential 0.1
+      ifelse random 100 < randomness
+      [
+        set next-node one-of turtles ;; formation strategy #1
+      ]
+      [
+        set next-node one-of (max-n-of nnn friend-nodes [count link-neighbors]) ;; formation strategy #2
+      ]
 
-  if advancement < 0 [ set features features + (-1 - features) * advancement * -1 ] ;; move from +1 towards -1 
-  if advancement > 0 [ set features features + ( 1 - features) * advancement ] ;; move from -1 towards +1
-
-  if features > 1 [ set features 1]
-  if features < -1 [ set features -1 ] 
-
-end
-
-
-
-to update-turtles
-
-   ask turtles [
-    let movement 0
-
-    set feat-memory fput features but-last feat-memory
-    set perc-feat mean feat-memory
-
-    ;; influence from features
-    set movement movement + sensitivity-features * perc-feat
-
-    ;; influence from habit
-    set movement movement + sensitivity-habit * habit
-
-
-    ;; influence from neighbors
-    ;; if the majority of the neighbors lean towards one direction, the agent follows
-    if count neighbors > 0
-    [      
-      let positive-neighbors (2 * count (turtles-on neighbors) with [habit > 0] / count neighbors) - 1 
-      set movement movement + sensitivity-social * positive-neighbors
-    ] 
-
-
-    ;; influence from media
-    set movement movement + sensitivity-media * global-average
-
-
-    ;; change habit
-    if movement > 0 [set habit habit + (1 - habit) * movement * speed]
-    if movement < 0 [set habit habit - (-1 - habit) * movement * speed]
-    
-    ;; update color
-    set color grey
-    if habit > 0 [ set color green ]
-    if habit < 0 [ set color red ] 
+      if not (link-neighbor? next-node or self = next-node) [create-link-with next-node]
+      set friend-nodes [link-neighbors] of next-node
+    ]
   ]
-
 end
 
+to go
+  create-new-node connect
+  
+  ; make the network look pretty
+  layout-spring (turtles with [any? link-neighbors]) links 0.4 6 1
+    
+  tick
+  if ticks > 1000 [stop]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-770
-32
-1237
-520
-25
-25
-8.961
+164
+18
+411
+286
+16
+16
+7.2
 1
 10
 1
 1
 1
 0
+0
+0
 1
-1
-1
--25
-25
--25
-25
+-16
+16
+-16
+16
 1
 1
 1
@@ -136,11 +93,11 @@ ticks
 30.0
 
 BUTTON
-17
-16
-97
-49
-setup
+23
+88
+152
+121
+reset network
 setup
 NIL
 1
@@ -153,11 +110,11 @@ NIL
 1
 
 BUTTON
-98
-16
-178
-49
-go
+23
+158
+152
+191
+lots of nodes
 go
 T
 1
@@ -170,144 +127,44 @@ NIL
 1
 
 PLOT
-218
-103
 418
-253
-features
-NIL
-NIL
+18
+797
+286
+histo
+degree
+nodes
 0.0
-10.0
--1.0
-1.0
+30.0
+0.0
+500.0
 true
 false
-"" ""
+"set-plot-x-range connect 100\nset-plot-y-range 0 count turtles\nset-plot-pen-interval 1" ""
 PENS
-"features" 1.0 0 -16777216 true "" "plot features"
-
-PLOT
-432
-32
-766
-273
-counts
-NIL
-NIL
-0.0
-1000.0
-0.0
-2400.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -2674135 true "" "plot count turtles with [color = red]"
-"pen-1" 1.0 0 -10899396 true "" "plot count turtles with [color = green]"
+"default" 2.0 1 -13210332 true "" "histogram [count link-neighbors] of turtles"
 
 SLIDER
-9
-306
-294
-339
-sensitivity-habit
-sensitivity-habit
+22
+18
+152
+51
+randomness
+randomness
 0
-0.1
-0
-0.01
+100
+50
+1
 1
 NIL
 HORIZONTAL
-
-SLIDER
-9
-271
-294
-304
-sensitivity-features
-sensitivity-features
-0
-0.1
-0.03
-0.01
-1
-NIL
-HORIZONTAL
-
-SLIDER
-10
-341
-295
-374
-sensitivity-social
-sensitivity-social
-0
-0.1
-0
-0.01
-1
-NIL
-HORIZONTAL
-
-PLOT
-11
-103
-211
-253
-average-habit
-NIL
-NIL
-0.0
-10.0
--1.0
-1.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot global-average"
-
-SLIDER
-10
-377
-295
-410
-sensitivity-media
-sensitivity-media
-0
-0.1
-0
-0.01
-1
-NIL
-HORIZONTAL
-
-PLOT
-432
-278
-764
-521
-habit-histogram
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"set-plot-x-range -1 1\nset-plot-y-range 0 count turtles\nset-plot-pen-interval 0.1" "set-plot-x-range -1 1"
-PENS
-"default" 1.0 1 -16777216 true "" "histogram [habit] of turtles"
 
 BUTTON
-194
-18
-275
-51
-go once
+23
+123
+152
+156
+add single node
 go
 NIL
 1
@@ -318,43 +175,102 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+418
+290
+480
+335
+nodes
+count turtles
+0
+1
+11
+
+MONITOR
+715
+290
+797
+335
+avg degree
+count links / count turtles
+0
+1
+11
+
+MONITOR
+483
+290
+573
+335
+max-friends
+[count link-neighbors] of max-one-of turtles [count link-neighbors]
+0
+1
+11
+
+MONITOR
+575
+290
+710
+335
+nodes w few friends
+count turtles with [count link-neighbors = connect]
+0
+1
+11
+
+SLIDER
+22
+53
+152
+86
+connect
+connect
+0
+10
+3
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-UNDEFINED
+(a general understanding of what the model is trying to show or explain)
+
+## HOW IT WORKS
+
+(what rules the agents use to create the overall behavior of the model)
 
 ## HOW TO USE IT
 
-UNDEFINED
+(how to use the model, including a description of each of the items in the Interface tab)
 
 ## THINGS TO NOTICE
 
-UNDEFINED
+(suggested things for the user to notice while running the model)
 
 ## THINGS TO TRY
 
-UNDEFINED
+(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
 
 ## EXTENDING THE MODEL
 
-UNDEFINED
+(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
 
 ## NETLOGO FEATURES
 
-UNDEFINED
+(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+
+## RELATED MODELS
+
+(models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
 
-UNDEFINED
-
-## HOW TO CITE
-
-UNDEFINED
-
-## COPYRIGHT AND LICENSE
-
-UNDEFINED
+(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
 @#$#@#$#@
 default
 true
@@ -548,6 +464,22 @@ Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
 Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
 Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
 
+sheep
+false
+15
+Circle -1 true true 203 65 88
+Circle -1 true true 70 65 162
+Circle -1 true true 150 105 120
+Polygon -7500403 true false 218 120 240 165 255 165 278 120
+Circle -7500403 true false 214 72 67
+Rectangle -1 true true 164 223 179 298
+Polygon -1 true true 45 285 30 285 30 240 15 195 45 210
+Circle -1 true true 3 83 150
+Rectangle -1 true true 65 221 80 296
+Polygon -1 true true 195 285 210 285 210 240 240 210 195 210
+Polygon -7500403 true false 276 85 285 105 302 99 294 83
+Polygon -7500403 true false 219 85 210 105 193 99 201 83
+
 square
 false
 0
@@ -632,6 +564,13 @@ Line -7500403 true 40 84 269 221
 Line -7500403 true 40 216 269 79
 Line -7500403 true 84 40 221 269
 
+wolf
+false
+0
+Polygon -16777216 true false 253 133 245 131 245 133
+Polygon -7500403 true true 2 194 13 197 30 191 38 193 38 205 20 226 20 257 27 265 38 266 40 260 31 253 31 230 60 206 68 198 75 209 66 228 65 243 82 261 84 268 100 267 103 261 77 239 79 231 100 207 98 196 119 201 143 202 160 195 166 210 172 213 173 238 167 251 160 248 154 265 169 264 178 247 186 240 198 260 200 271 217 271 219 262 207 258 195 230 192 198 210 184 227 164 242 144 259 145 284 151 277 141 293 140 299 134 297 127 273 119 270 105
+Polygon -7500403 true true -1 195 14 180 36 166 40 153 53 140 82 131 134 133 159 126 188 115 227 108 236 102 238 98 268 86 269 92 281 87 269 103 269 113
+
 x
 false
 0
@@ -643,14 +582,6 @@ NetLogo 5.2-RC3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="300" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="1000"/>
-    <metric>count turtles with [color = red]</metric>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

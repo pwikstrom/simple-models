@@ -1,6 +1,6 @@
 ;; Patrik Wikström, QUT
 ;; September 2014
-
+;; a new comment
 globals [
   features
   global-average
